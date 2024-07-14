@@ -3,6 +3,7 @@ from pybgpstream import BGPStream
 import pandas as pd
 import ipaddress
 import time
+from datetime import datetime
 
 # Set up logging
 logging.basicConfig(filename='rrc26.txt', level=logging.INFO, format='%(asctime)s %(message)s')
@@ -39,6 +40,8 @@ def process_bgp_records(stream, ip_ranges):
     with open('matched_records.txt', 'a') as match_file:
         for rec in stream.records():
             record_count += 1
+            timestamp = datetime.utcfromtimestamp(rec.time).strftime('%Y-%m-%d %H:%M:%S')
+            logging.info(f"Record {record_count} at {timestamp}")
             if record_count % 100 == 0:
                 logging.info(f"Processed {record_count} records so far")
             for elem in rec:
@@ -50,6 +53,7 @@ def process_bgp_records(stream, ip_ranges):
                         for ip_range in ip_ranges:
                             if prefix.version == ip_range.version and prefix.subnet_of(ip_range):
                                 match_info = {
+                                    "timestamp": timestamp,
                                     "type": elem.type,
                                     "peer_address": elem.peer_address,
                                     "prefix": prefix,
@@ -58,7 +62,7 @@ def process_bgp_records(stream, ip_ranges):
                                     "communities": elem.fields.get('communities', 'N/A')
                                 }
                                 match_info_str = (
-                                    f"{match_info['type']} {match_info['peer_address']} "
+                                    f"{match_info['timestamp']} {match_info['type']} {match_info['peer_address']} "
                                     f"{match_info['prefix']} AS Path: {match_info['as_path']} "
                                     f"Next Hop: {match_info['next_hop']} "
                                     f"Communities: {match_info['communities']}"
