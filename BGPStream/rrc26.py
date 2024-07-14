@@ -41,7 +41,7 @@ def process_bgp_records(stream, ip_ranges):
         for rec in stream.records():
             record_count += 1
             timestamp = datetime.utcfromtimestamp(rec.time).strftime('%Y-%m-%d %H:%M:%S')
-            logging.info(f"Record {record_count} at {timestamp}")
+            # logging.info(f"Record {record_count} at {timestamp}")
             if record_count % 100 == 0:
                 logging.info(f"Processed {record_count} records so far")
             for elem in rec:
