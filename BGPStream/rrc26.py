@@ -6,7 +6,7 @@ import ipaddress
 import time
 
 # Set up logging
-logging.basicConfig(filename='2rrc26.txt', level=logging.INFO, format='%(asctime)s %(message)s')
+logging.basicConfig(filename='rrc26.txt', level=logging.INFO, format='%(asctime)s %(message)s')
 
 # Function to create a BGPStream instance with filters
 # def create_bgpstream(start_time, end_time, collectors):
@@ -49,7 +49,7 @@ def process_bgp_records(stream, ip_ranges):
     record_count = 0
     element_count = 0
     match_count = 0
-    with open('2matched_records.txt', 'a') as match_file:
+    with open('matched_records.txt', 'a') as match_file:
         for rec in stream.records():
             record_count += 1
             timestamp = datetime.utcfromtimestamp(rec.time).strftime('%Y-%m-%d %H:%M:%S')
