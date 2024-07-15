@@ -1,5 +1,6 @@
 import logging
-from pybgpstream import BGPStream
+# from pybgpstream import BGPStream
+import pybgpstream
 import pandas as pd
 import ipaddress
 import time
@@ -8,14 +9,24 @@ import time
 logging.basicConfig(filename='route-views_bdix.txt', level=logging.INFO, format='%(asctime)s %(message)s')
 
 # Function to create a BGPStream instance with filters
+# def create_bgpstream(start_time, end_time, collectors):
+#     logging.info("Creating BGPStream instance with filters")
+#     stream = BGPStream()
+#     for collector in collectors:
+#         logging.info(f"Adding collector: {collector}")
+#         stream.add_filter('collector', collector)
+#     stream.add_interval_filter(start_time, end_time)
+#     logging.info(f"Time interval filter added: {start_time} to {end_time}")
+#     return stream
+
 def create_bgpstream(start_time, end_time, collectors):
     logging.info("Creating BGPStream instance with filters")
-    stream = BGPStream()
-    for collector in collectors:
-        logging.info(f"Adding collector: {collector}")
-        stream.add_filter('collector', collector)
-    stream.add_interval_filter(start_time, end_time)
-    logging.info(f"Time interval filter added: {start_time} to {end_time}")
+    stream = pybgpstream.BGPStream(
+        from_time=start_time,
+        until_time=end_time,
+        collectors=collectors,
+        record_type="updates"
+    )
     return stream
 
 # Function to load IP ranges from CSV
@@ -25,8 +36,13 @@ def load_ip_ranges(csv_file):
     ip_ranges = []
     for _, row in df.iterrows():
         ip_range = ipaddress.ip_network(row['CIDR'], strict=False)
-        logging.info(f"Loaded IP range: {ip_range}")
-        ip_ranges.append(ip_range)
+        ip_info = {
+            'ip_range': ip_range,
+            'region': row['Region'],
+            'city': row['City']
+        }
+        logging.info(f"Loaded IP range: {ip_range} with region: {row['Region']} and city: {row['City']}")
+        ip_ranges.append(ip_info)
     logging.info(f"Total IP ranges loaded: {len(ip_ranges)}")
     return ip_ranges
 
@@ -36,7 +52,7 @@ def process_bgp_records(stream, ip_ranges):
     record_count = 0
     element_count = 0
     match_count = 0
-    with open('matched_records.txt', 'a') as match_file:
+    with open('bdix_matched_records.txt', 'a') as match_file:
         for rec in stream.records():
             record_count += 1
             if record_count % 100 == 0:
@@ -47,7 +63,8 @@ def process_bgp_records(stream, ip_ranges):
                     prefix_str = elem.fields['prefix']
                     try:
                         prefix = ipaddress.ip_network(prefix_str, strict=False)
-                        for ip_range in ip_ranges:
+                        for ip_info in ip_ranges:
+                            ip_range = ip_info['ip_range']
                             if prefix.version == ip_range.version and prefix.subnet_of(ip_range):
                                 match_info = {
                                     "type": elem.type,
@@ -55,13 +72,16 @@ def process_bgp_records(stream, ip_ranges):
                                     "prefix": prefix,
                                     "as_path": elem.fields.get('as-path', 'N/A'),
                                     "next_hop": elem.fields.get('next-hop', 'N/A'),
-                                    "communities": elem.fields.get('communities', 'N/A')
+                                    "communities": elem.fields.get('communities', 'N/A'),
+                                    "region": ip_info['region'],
+                                    "city": ip_info['city']
                                 }
                                 match_info_str = (
                                     f"{match_info['type']} {match_info['peer_address']} "
                                     f"{match_info['prefix']} AS Path: {match_info['as_path']} "
                                     f"Next Hop: {match_info['next_hop']} "
-                                    f"Communities: {match_info['communities']}"
+                                    f"Communities: {match_info['communities']} "
+                                    f"Region: {match_info['region']} City: {match_info['city']}"
                                 )
                                 logging.info(f"Match found: {match_info_str}")
                                 match_file.write(match_info_str + '\n')
@@ -90,7 +110,7 @@ def fetch_bgp_data_with_retries(start_time, end_time, collectors, ip_ranges, max
 def main():
     start_time = 1654041600  # June 1, 2022
     end_time = 1667174400    # October 31, 2022
-    collectors = ['route-views.bdix.routeviews.org']
+    collectors = ['route-views.bdix']
     logging.info("Starting main function")
     ip_ranges = load_ip_ranges('pakistan_ip_data_with_cidr.csv')
     fetch_bgp_data_with_retries(start_time, end_time, collectors, ip_ranges)
